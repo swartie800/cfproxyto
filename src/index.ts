@@ -1,32 +1,61 @@
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
+export interface Env {}
 
-export interface Env {
-	// Example binding to KV. Learn more at https://developers.cloudflare.com/workers/runtime-apis/kv/
-	// MY_KV_NAMESPACE: KVNamespace;
-	//
-	// Example binding to Durable Object. Learn more at https://developers.cloudflare.com/workers/runtime-apis/durable-objects/
-	// MY_DURABLE_OBJECT: DurableObjectNamespace;
-	//
-	// Example binding to R2. Learn more at https://developers.cloudflare.com/workers/runtime-apis/r2/
-	// MY_BUCKET: R2Bucket;
-	//
-	// Example binding to a Service. Learn more at https://developers.cloudflare.com/workers/runtime-apis/service-bindings/
-	// MY_SERVICE: Fetcher;
-	//
-	// Example binding to a Queue. Learn more at https://developers.cloudflare.com/queues/javascript-apis/
-	// MY_QUEUE: Queue;
-}
+const headers = {
+	Referer: 'https://e69975b881.nl/',
+};
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		return new Response('Hello World!');
+		const url = new URL(request.url);
+		const port = url.port;
+		const host = 'https://' + url.hostname + '/';
+		const pathname = url.pathname;
+		const splitedPath = pathname.split('/');
+		const link = splitedPath[1];
+		const decodedLink = decodeURIComponent(link).trim();
+
+		const pattern = /\/h\/list/;
+		const test = pattern.test(decodedLink);
+
+		const res = await fetch(decodedLink, { headers: headers });
+		const buffer = await res.arrayBuffer();
+		// const textbuffer = await res.text()
+		// const txt:stri = buffer
+		if (decodedLink.endsWith('.m3u8') && !test) {
+			const text = new TextDecoder().decode(buffer);
+			const splited = text.split('\n');
+			splited.map((line, index) => {
+				const t_line = line.trim();
+
+				if (t_line.startsWith('https://')){
+					splited[index] = host + encodeURIComponent(t_line);
+				}
+			});
+			const joined = splited.join('\n');
+			const response = new Response(joined);
+			response.headers.set('Access-Control-Allow-Origin', '*');
+			return response;
+		} else if (decodedLink.endsWith('.m3u8') && test) {
+			const text = new TextDecoder().decode(buffer);
+			const splited = text.split('\n');
+			const splitedUrl = decodedLink.split(/\/list/);
+			const mainPart = splitedUrl[0];
+			splited.map((line, index) => {
+				const t_line: string = line.trim();
+				if (/.m3u8/.test(t_line)) {
+					// console.log(t_line)
+					splited[index] = host + encodeURIComponent(mainPart + '/' + t_line);
+					console.log(splited[index]);
+				}
+			});
+			const joined = splited.join('\n');
+			const response = new Response(joined);
+			response.headers.set('Access-Control-Allow-Origin', '*');
+			return response;
+		} else {
+			const response = new Response(buffer);
+			response.headers.set('Access-Control-Allow-Origin', '*');
+			return response;
+		}
 	},
 };
